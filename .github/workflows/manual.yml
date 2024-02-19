@@ -1,18 +1,23 @@
-name: Detect Deleted Files
+name: Detect Changes
 
 on:
   pull_request:
     types: [opened, synchronize]
 
 jobs:
-  detect_deleted_files:
+  detect_changes:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
       
-    - name: Detect deleted files
+    - name: Detect changes in file content
       run: |
         git fetch origin ${{ github.event.pull_request.base.sha }} --depth=1
-        git diff --name-only FETCH_HEAD ${{ github.event.pull_request.head.sha }} | grep '^deleted_file_path/' && exit 1 || exit 0
+        git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | while read changed_file; do
+          if [[ $(git diff ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} -- "$changed_file" | grep -E '^\+' | grep -vE '^\+\+\+' | wc -l) -gt 0 ]]; then
+            echo "File content changed: $changed_file";
+            exit 1;
+          fi;
+        done
